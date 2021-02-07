@@ -90,19 +90,19 @@ Resources:
 
 Outputs:
 
-  Arn:
+  ESSArn:
     Description: ESS ARN
     Value: !GetAtt ESS.Arn
     Export:
       Name: !Sub "${AWS::StackName}-ess-arn"
 
-  DomainEndpoint:
+  ESSDomainEndpoint:
     Description: ESS Domain Endpoint
     Value: !GetAtt ESS.DomainEndpoint
     Export:
       Name: !Sub "${AWS::StackName}-ess-domain-endpoint"
 
-  DomainArn:
+  ESSDomainArn:
     Description: ESS Domain ARN
     Value: !GetAtt ESS.DomainArn
     Export:
