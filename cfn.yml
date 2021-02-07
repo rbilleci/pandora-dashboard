@@ -62,6 +62,11 @@ Resources:
               AWS: '*'
             Action: 'es:ESHttp*'
             Resource: '*'
+          - Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: 'es:ESHttp*'
+            Resource: '*'            
       AdvancedSecurityOptions:
         Enabled: true
         InternalUserDatabaseEnabled: true
@@ -74,7 +79,7 @@ Resources:
         #CustomEndpointEnabled: Boolean
         EnforceHTTPS: true
         TLSSecurityPolicy: Policy-Min-TLS-1-2-2019-07     
-      DomainName: !Sub es-${AWS::StackName}-${AWS::Region}
+      DomainName: !Sub es-pandora-${AWS::Region}
       #EBSOptions:
       #  EBSEnabled: true
       #  VolumeSize: 256
