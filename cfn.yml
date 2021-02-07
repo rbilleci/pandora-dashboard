@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  ESSInstanceType:
+    Type: String
+    Default: i3.xlarge.elasticsearch 
+    AllowedValues:
+      - i3.large.elasticsearch
+      - i3.xlarge.elasticsearch 
+      - c5.2xlarge.elasticsearch
+      - m5.2xlarge.elasticsearch 
+      - t3.medium.elasticsearch 
+      - r5.xlarge.elasticsearch
+      
+  ESSUser:
+    Type: String
+    Default: admin
+    NoEcho: true
+  
+  ESSUserPassword:
+    Type: String
+    Default: password
+    NoEcho: true
+
+
+Resources:
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub dashboard-${AWS::Region}-${AWS::AccountId}
+
+  DashboardRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: DashboardRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - sagemaker.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess                  
+
+  ESS:
+    Type: AWS::Elasticsearch::Domain
+    UpdatePolicy:
+      EnableVersionUpgrade: true    
+    Properties:
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: 'es:ESHttp*'
+            Resource: '*'
+      AdvancedSecurityOptions:
+        Enabled: true
+        InternalUserDatabaseEnabled: true
+        MasterUserOptions: 
+          MasterUserName: !Ref ESSUser
+          MasterUserPassword: !Ref ESSUserPassword
+      DomainEndpointOptions:
+        #CustomEndpoint: String
+        #CustomEndpointCertificateArn: String
+        #CustomEndpointEnabled: Boolean
+        EnforceHTTPS: true
+        TLSSecurityPolicy: Policy-Min-TLS-1-2-2019-07     
+      DomainName: !Sub es-${AWS::StackName}-${AWS::Region}
+      #EBSOptions:
+      #  EBSEnabled: true
+      #  VolumeSize: 256
+      #  VolumeType: gp2
+      ElasticsearchVersion: 7.9
+      ElasticsearchClusterConfig:
+        InstanceCount: 1
+        InstanceType: !Ref ESSInstanceType
+      EncryptionAtRestOptions:
+        Enabled: true
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+
+Outputs:
+
+  Arn:
+    Description: ESS ARN
+    Value: !GetAtt ESS.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ess-arn"
+
+  DomainEndpoint:
+    Description: ESS Domain Endpoint
+    Value: !GetAtt ESS.DomainEndpoint
+    Export:
+      Name: !Sub "${AWS::StackName}-ess-domain-endpoint"
+
+  DomainArn:
+    Description: ESS Domain ARN
+    Value: !GetAtt ESS.DomainArn
+    Export:
+      Name: !Sub "${AWS::StackName}-ess-domain-arn"
+
