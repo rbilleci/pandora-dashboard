@@ -1,4 +1,12 @@
+import json
+
+import boto3 as boto3
 import pandas as pd
+import os
+
+from elasticsearch import helpers
+from requests_aws4auth import AWS4Auth
+from elasticsearch import Elasticsearch, RequestsHttpConnection
 
 pd.options.display.max_columns = None
 pd.options.display.max_rows = None
@@ -45,9 +53,88 @@ def prepare(fn, plan):
                        (df['h2_testing_policy'] / 3.) + \
                        (df['h3_contact_tracing'] / 2.) + \
                        (df['h6_facial_coverings'] / 4.)
-    df.to_csv(f"processed{fn}", index=False)
+
+    # all countries and region
+    df.to_json(f"processed_all{fn}".replace('.csv', '.json'),
+               orient='records', lines=False, date_format='iso')
+
+    # only countries
+    df_countries = df.loc[df['region_name'] == '']
+    df_countries.to_json(f"processed_countries{fn}".replace('.csv', '.json'),
+                         orient='records', lines=False, date_format='iso')
+
+    # us regions
+    df_us = df.loc[(df['country_name'] == 'United States') & (df['region_name'] != '')]
+    df_us.to_json(f"processed_us{fn}".replace('.csv', '.json'),
+                  orient='records', lines=False, date_format='iso')
+
+    # uk regions
+    df_uk = df.loc[(df['country_name'] == 'United Kingdom') & (df['region_name'] != '')]
+    df_uk.to_json(f"processed_uk{fn}".replace('.csv', '.json'),
+                  orient='records', lines=False, date_format='iso')
 
 
+def decorate_json(documents, _index, doc_type):
+    for doc in documents:
+        doc['date'] = doc['date'].split('T')[0]
+        """
+        if doc['plan'] == 'Baseline':
+            doc['plan'] = 0
+        elif doc['plan'] == 'Intervention Plan 1':
+            doc['plan'] = 1
+        elif doc['plan'] == 'Intervention Plan 2':
+            doc['plan'] = 2
+        elif doc['plan'] == 'Intervention Plan 3':
+            doc['plan'] = 3
+        elif doc['plan'] == 'Intervention Plan 4':
+            doc['plan'] = 4
+        elif doc['plan'] == 'Intervention Plan 5':
+            doc['plan'] = 5
+        elif doc['plan'] == 'Intervention Plan 6':
+            doc['plan'] = 6
+        elif doc['plan'] == 'Intervention Plan 7':
+            doc['plan'] = 7
+        elif doc['plan'] == 'Intervention Plan 8':
+            doc['plan'] = 8
+        elif doc['plan'] == 'Intervention Plan 9':
+            doc['plan'] = 9
+        elif doc['plan'] == 'Intervention Plan 10':
+            doc['plan'] = 10
+        """
+        yield {
+            "_index": _index,
+            "_type": doc_type,
+            "_id": f"{doc['geo_code']}-{doc['plan']}-{doc['date']}",
+            "_source": doc}
+
+
+def load():
+    # get es connection
+    region = 'us-east-1'
+    endpoint = boto3.client('es').describe_elasticsearch_domain(DomainName=f"es-pandora-{region}")['DomainStatus'][
+        'Endpoint']
+    credentials = boto3.Session().get_credentials()
+    auth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
+    es = Elasticsearch(
+        hosts=[{'host': endpoint, 'port': 443}],
+        http_auth=auth,
+        use_ssl=True,
+        verify_certs=True,
+        connection_class=RequestsHttpConnection,
+    )
+
+    for ip in ['baseline', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']:
+        for typ in ['all', 'countries', 'us', 'uk']:
+            fn = f"processed_{typ}_plan_{ip}.json"
+            index = f"index_{typ}"
+            print(fn)
+            file = open(fn, 'r')
+            documents = json.loads(file.read())
+            documents = decorate_json(documents, index, 'update')
+            helpers.bulk(es, documents)
+
+
+"""
 prepare("_plan_0.csv", 'Intervention Plan 1')
 prepare("_plan_1.csv", 'Intervention Plan 2')
 prepare("_plan_2.csv", 'Intervention Plan 3')
@@ -59,3 +146,5 @@ prepare("_plan_7.csv", 'Intervention Plan 8')
 prepare("_plan_8.csv", 'Intervention Plan 9')
 prepare("_plan_9.csv", 'Intervention Plan 10')
 prepare("_plan_baseline.csv", 'Baseline')
+"""
+load()
